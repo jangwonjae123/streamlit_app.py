@@ -28,6 +28,7 @@ st.subheader("2. 질문을 입력하세요")
 question = st.text_input("질문", placeholder="예) 부산의 날씨를 알려줘")
 
 
+
 # 3) gpt-5-mini 호출 함수 (캐시 적용) --------------------------------------------
 @st.cache_data(show_spinner=True)
 def ask_gpt(api_key: str, user_question: str) -> str:
