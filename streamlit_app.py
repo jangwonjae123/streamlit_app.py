@@ -1,76 +1,60 @@
 import streamlit as st
 from openai import OpenAI
-import base64
 
-st.title("GPT-5-mini 질문 + 이미지 생성 웹앱")
+# 페이지 기본 설정
+st.set_page_config(page_title="GPT-5 Mini Q&A", page_icon="🤖")
 
-# 1. API Key 입력
-api_key = st.text_input("OpenAI API Key를 입력하세요", type="password")
+st.title("실습 1: GPT-5 Mini 질문/답변 앱")
 
-# API Key가 있을 때만 클라이언트 생성
-client = OpenAI(api_key=api_key) if api_key else None
+# 1) session_state 에 API Key 저장 ------------------------------------------------
+if "api_key" not in st.session_state:
+    st.session_state.api_key = ""
 
-# -----------------------
-# 1) 텍스트 질문 → gpt-5-mini 답변
-# -----------------------
-st.subheader("1) 텍스트 질문 보내기 (gpt-5-mini)")
+st.subheader("1. OpenAI API Key 입력")
 
-question = st.text_area(
-    "무엇이든 물어보세요",
-    placeholder="예: 부경대학교에 대해 간단히 소개해 줘",
-    height=120,
+st.session_state.api_key = st.text_input(
+    "OpenAI API Key를 입력하세요",
+    type="password",                   # 비밀번호 형식
+    value=st.session_state.api_key,    # 페이지 새로고침/이동 후에도 유지
+    placeholder="sk- 로 시작하는 키를 입력하세요",
 )
 
+st.caption("⚠️ 과제 제출 전에 API Key는 꼭 지우거나 빈 값으로 바꾸고 제출하세요.")
+
+
+# 2) 질문 입력 --------------------------------------------------------------------
+st.subheader("2. 질문을 입력하세요")
+
+question = st.text_input("질문", placeholder="예) 부산의 날씨를 알려줘")
+
+
+# 3) gpt-5-mini 호출 함수 (캐시 적용) --------------------------------------------
+@st.cache_data(show_spinner=True)
+def ask_gpt(api_key: str, user_question: str) -> str:
+    """
+    같은 API Key + 같은 질문이면
+    다시 실행해도 이전 결과를 재사용하도록 캐시하는 함수.
+    """
+    if not api_key:
+        return "⚠️ 먼저 OpenAI API Key를 입력해주세요."
+    if not user_question:
+        return "⚠️ 질문을 입력해주세요."
+
+    client = OpenAI(api_key=api_key)
+
+    response = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[
+            {"role": "developer", "content": "You are a helpful assistant."},
+            {"role": "user", "content": user_question},
+        ],
+    )
+
+    return response.choices[0].message.content
+
+
+# 4) 버튼 눌러서 응답 받기 --------------------------------------------------------
 if st.button("질문 보내기"):
-    if not api_key:
-        st.error("먼저 OpenAI API Key를 입력하세요.")
-    elif not question.strip():
-        st.error("질문을 입력하세요.")
-    else:
-        try:
-            chat = client.chat.completions.create(
-                model="gpt-5-mini",
-                messages=[
-                    {"role": "system", "content": "당신은 친절한 한국어 도우미입니다."},
-                    {"role": "user", "content": question},
-                ],
-            )
-            answer = chat.choices[0].message.content
-            st.subheader("→ 모델의 답변")
-            st.write(answer)
-        except Exception as e:
-            st.error(f"에러가 발생했습니다: {e}")
-
-# -----------------------
-# 2) 이미지 프롬프트 → gpt-image-1-mini 이미지 생성
-# -----------------------
-st.markdown("---")
-st.subheader("2) 이미지 생성하기 (gpt-image-1-mini)")
-
-image_prompt = st.text_input(
-    "이미지 프롬프트를 입력하세요",
-    placeholder="예: 부산 바다 앞에서 춤추는 북극곰 일러스트",
-)
-
-if st.button("이미지 생성"):
-    if not api_key:
-        st.error("먼저 OpenAI API Key를 입력하세요.")
-    elif not image_prompt.strip():
-        st.error("이미지 프롬프트를 입력하세요.")
-    else:
-        try:
-            # gpt-image-1-mini 모델로 이미지 생성
-            img = client.images.generate(
-                model="gpt-image-1-mini",
-                prompt=image_prompt,
-                size="1024x1024",  # ✅ 지원되는 사이즈
-            )
-
-            # b64_json 을 디코딩해서 이미지 바이트로 변환
-            image_bytes = base64.b64decode(img.data[0].b64_json)
-
-            # 메모리 상의 이미지를 화면에 표시
-            st.image(image_bytes, caption="생성된 이미지", use_column_width=True)
-
-        except Exception as e:
-            st.error(f"이미지 생성 중 에러가 발생했습니다: {e}")
+    answer = ask_gpt(st.session_state.api_key, question)
+    st.markdown("### 💬 모델의 응답")
+    st.write(answer)
